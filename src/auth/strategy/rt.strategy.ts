@@ -8,10 +8,7 @@ import { JwtDto } from '../dto/jwt.dto';
 
 @Injectable()
 export class RtStrategy extends PassportStrategy(Strategy, 'jwt-refresh') {
-  constructor(
-    private readonly authService: AuthService,
-    readonly configService: ConfigService,
-  ) {
+  constructor(readonly configService: ConfigService) {
     super({
       jwtFromRequest: ExtractJwt.fromAuthHeaderAsBearerToken(),
       secretOrKey: configService.get('JWT_REFRESH_SECRET'),

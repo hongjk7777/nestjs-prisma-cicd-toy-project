@@ -1,13 +1,16 @@
 import {
   BadRequestException,
+  CACHE_MANAGER,
   ConflictException,
   ForbiddenException,
+  Inject,
   Injectable,
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { JwtService } from '@nestjs/jwt';
 import { Prisma, User } from '@prisma/client';
 import { compare, hash } from 'bcrypt';
+import { Cache } from 'cache-manager';
 import { PrismaService } from 'nestjs-prisma';
 import { SecurityConfig } from 'src/common/config/config.interface';
 import { Token } from 'src/model/token.model';
@@ -16,10 +19,14 @@ import { SignupDto } from './dto/signup.dto';
 
 @Injectable()
 export class AuthService {
+  ACCES_KEY = 'access-';
+  REFRESH_KEY = 'refresh-';
+
   constructor(
     private readonly prisma: PrismaService,
     private readonly jwtService: JwtService,
     private readonly configService: ConfigService,
+    @Inject(CACHE_MANAGER) private cacheManager: Cache,
   ) {}
 
   validateUser(userId: number): Promise<User> {
@@ -63,19 +70,13 @@ export class AuthService {
       where: { email: userData.email },
     });
 
-    const loginSuccess = compare(userData.password, user.password);
+    const loginSuccess = await compare(userData.password, user.password);
 
     if (!loginSuccess) {
       throw new BadRequestException('Invalid password');
     }
 
     return await this.generateTokens({ userId: user.id.toString() });
-  }
-
-  generateCookieWithToken(token: Token): string {
-    const securityConfig = this.configService.get<SecurityConfig>('security');
-
-    return `Authentication=${token}; HttpOnly; Path=/; Max-Age=${securityConfig.expiresIn}`;
   }
 
   async generateTokens(payload: { userId: string }): Promise<Token> {
@@ -90,15 +91,14 @@ export class AuthService {
   }
 
   private async updateTokens(payload: { userId: string }, tokens: Token) {
-    await this.prisma.user.update({
-      where: {
-        id: parseInt(payload.userId),
-      },
-      data: {
-        access_token: tokens.accessToken,
-        refresh_token: tokens.refreshToken,
-      },
-    });
+    await this.cacheManager.set(
+      this.ACCES_KEY + payload.userId,
+      tokens.refreshToken,
+    );
+    await this.cacheManager.set(
+      this.REFRESH_KEY + payload.userId,
+      tokens.refreshToken,
+    );
   }
 
   private generateAccessToken(payload: { userId: string }): string {
@@ -116,34 +116,22 @@ export class AuthService {
   }
 
   async refreshTokens(userId: number, refreshToken: string) {
-    const user = await this.prisma.user.findUnique({
-      where: { id: parseInt(userId.toString()) },
-    });
+    // if (!user) {
+    //   throw new ForbiddenException('Access Denied');
+    // }
 
-    if (!user) {
-      throw new ForbiddenException('Access Denied');
-    }
+    const savedRt = await this.cacheManager.get(this.REFRESH_KEY + userId);
 
-    console.log(user.refresh_token);
-    console.log(refreshToken);
-
-    if (user.refresh_token !== refreshToken) {
-      await this.expireTokens(user.id);
+    if (savedRt !== refreshToken) {
+      await this.expireTokens(userId);
       throw new ForbiddenException('Invalid Refresh Token');
     }
 
-    return await this.generateTokens({ userId: user.id.toString() });
+    return await this.generateTokens({ userId: userId.toString() });
   }
 
   async expireTokens(userId: number) {
-    await this.prisma.user.update({
-      where: {
-        id: userId,
-      },
-      data: {
-        access_token: '',
-        refresh_token: '',
-      },
-    });
+    await this.cacheManager.del(this.ACCES_KEY + userId);
+    await this.cacheManager.del(this.REFRESH_KEY + userId);
   }
 }

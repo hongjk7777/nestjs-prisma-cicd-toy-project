@@ -1,5 +1,5 @@
-import { Module } from '@nestjs/common';
-import { ConfigModule } from '@nestjs/config';
+import { CacheModule, CacheStore, Module } from '@nestjs/common';
+import { ConfigModule, ConfigService } from '@nestjs/config';
 import Joi from 'joi';
 import { loggingMiddleware, PrismaModule } from 'nestjs-prisma';
 import config from './common/config/config';
@@ -8,6 +8,7 @@ import { AppService } from './app.service';
 import { AuthModule } from './auth/auth.module';
 import { APP_GUARD } from '@nestjs/core';
 import { AtAuthGuard } from './common/guard/atAuth.guard';
+import { redisStore } from 'cache-manager-redis-store';
 
 @Module({
   imports: [
@@ -28,6 +29,17 @@ import { AtAuthGuard } from './common/guard/atAuth.guard';
       prismaServiceOptions: {
         middlewares: [loggingMiddleware()],
       },
+    }),
+    CacheModule.registerAsync({
+      isGlobal: true,
+      imports: [ConfigModule],
+      useFactory: async (configService: ConfigService) => ({
+        ttl: configService.get('CACHE_TTL'),
+        store: (await redisStore({
+          url: configService.get('REDIS_URL'),
+        })) as unknown as CacheStore,
+      }),
+      inject: [ConfigService],
     }),
     AuthModule,
   ],
