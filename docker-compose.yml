@@ -1,0 +1,44 @@
+version: '3'
+services:
+  nest-api:
+    container_name: nest-api
+    build:
+      context: .
+      dockerfile: Dockerfile
+    ports:
+      - 3000:3000
+    env_file:
+      - ./env/.${NODE_ENV}.env
+    depends_on:
+      - redis
+      - mysql
+
+  mysql:
+    image: mysql:latest
+    container_name: mysql
+    restart: always
+    ports:
+      - 3306:3306
+    env_file:
+      - ./env/.test.env
+    # volumes:
+    #   - /var/lib/mysql
+
+  redis:
+    image: redis:6.2.6-alpine
+    container_name: redis
+    restart: always
+    command: redis-server
+    ports:
+      - 6379:6379
+    expose:
+      - 6379
+
+  nginx:
+    image: nginx:test
+    restart: always
+    ports:
+      - 80:80
+      - 443:443
+    depends_on:
+      - nest-api
