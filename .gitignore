@@ -34,9 +34,10 @@ lerna-debug.log*
 !.vscode/launch.json
 !.vscode/extensions.json
 
-# Prisma
-/prisma
-
 # ENV
 *.env
 /env
+
+# Prisma
+*.sql
+*.toml

@@ -15,10 +15,11 @@ COPY prisma ./prisma/
 
 # Install app dependencies
 RUN npm install
+RUN npm install pm2 -g
 
 COPY . .
 
-ENV NODE_ENV=${NODE_ENV}
+ENV NODE_ENV=production
 
 # CMD [ "npm", "run", "start" ]
 RUN chmod +x docker-entrypoint.sh

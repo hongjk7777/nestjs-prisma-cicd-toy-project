@@ -7,8 +7,11 @@ services:
       dockerfile: Dockerfile
     ports:
       - 3000:3000
+    environment:
+      - NODE_ENV=production
+      - PATH=/usr/local/lib/node_modules/pm2/bin:$PATH
     env_file:
-      - ./env/.${NODE_ENV}.env
+      - ./env/.production.env
     depends_on:
       - redis
       - mysql
@@ -20,7 +23,7 @@ services:
     ports:
       - 3306:3306
     env_file:
-      - ./env/.test.env
+      - ./env/.production.env
     # volumes:
     #   - /var/lib/mysql
 
