@@ -69,8 +69,11 @@ jobs:
 
       - run: npm run generate:prod
       - run: npm run build --if-present
+        if: always()
       - run: npm run lint
+        if: always()
       - run: npm test
+        if: always()
         env:
           NODE_ENV: production
 
@@ -117,3 +120,15 @@ jobs:
             sudo docker pull ${{ secrets.DOCKER_REPO }}/nest-api
             docker-compose up -d
             docker image prune -f
+
+      - name: action-slack
+        uses: 8398a7/action-slack@v3
+        with:
+          status: ${{ job.status }}
+          author_name: Nestjs toy project - prod
+          fields: repo,commit,message,author # action,eventName,ref,workflow,job,took 추가할 수 있음
+          mention: here
+          if_mention: failure,cancelled
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }} # required
+        if: always()
